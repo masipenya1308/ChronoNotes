@@ -265,9 +265,9 @@ private fun VaultForm(
                 modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
             )
         }
-        if (error != null) {
+        error?.let { message ->
             Text(
-                error,
+                message,
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(top = 8.dp),

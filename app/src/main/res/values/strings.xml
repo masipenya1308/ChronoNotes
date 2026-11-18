@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ChronoNotes</string>
+    <string name="widget_label">Закреплённые заметки</string>
+    <string name="widget_description">Показывает до четырёх закреплённых заметок</string>
+</resources>

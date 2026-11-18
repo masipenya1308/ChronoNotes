@@ -61,9 +61,13 @@ data class NoteTagCrossRef(val noteId: Long, val tagId: Long)
 data class NoteWithTags(
     @Embedded val note: Note,
     @Relation(
-        parentColumn = "id",
-        entityColumn = "tagId",
-        associateBy = Junction(NoteTagCrossRef::class),
+        parentColumn = "id",      // Note.id
+        entityColumn = "id",      // Tag.id — колонка в связанной сущности
+        associateBy = Junction(
+            NoteTagCrossRef::class,
+            parentColumn = "noteId", // колонка связи -> Note.id
+            entityColumn = "tagId",  // колонка связи -> Tag.id
+        ),
     )
     val tags: List<Tag> = emptyList(),
 )

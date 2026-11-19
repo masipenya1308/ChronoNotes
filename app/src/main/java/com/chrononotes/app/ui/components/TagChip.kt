@@ -1,6 +1,8 @@
 package com.chrononotes.app.ui.components
 
 import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.FilterChip
@@ -21,7 +23,7 @@ fun TagChip(tag: Tag, onClick: (() -> Unit)? = null) {
         label = { Text(tag.name, style = androidx.compose.material3.MaterialTheme.typography.labelSmall) },
         leadingIcon = {
             Icon(
-                androidx.compose.material.icons.Icons.Default.Tag,
+                Icons.Default.Tag,
                 contentDescription = null,
                 modifier = Modifier.size(14.dp),
                 tint = hexToColor(tag.colorHex),
@@ -40,7 +42,7 @@ fun SelectableTagChip(tag: Tag, selected: Boolean, onToggle: () -> Unit) {
         label = { Text(tag.name, style = androidx.compose.material3.MaterialTheme.typography.labelSmall) },
         leadingIcon = {
             Icon(
-                androidx.compose.material.icons.Icons.Default.Tag,
+                Icons.Default.Tag,
                 contentDescription = null,
                 modifier = Modifier.size(14.dp),
                 tint = if (selected) Color.Unspecified else hexToColor(tag.colorHex),

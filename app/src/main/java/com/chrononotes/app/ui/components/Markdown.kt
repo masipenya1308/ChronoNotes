@@ -15,6 +15,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
@@ -173,8 +174,9 @@ fun MarkdownText(
 
 @Composable
 private fun Heading(text: String, level: Int) {
+    val annotated = remember(text) { inlineMarkdown(text) }
     Text(
-        text = inlineMarkdown(text),
+        text = annotated,
         style = when (level) {
             1 -> MaterialTheme.typography.headlineSmall
             2 -> MaterialTheme.typography.titleLarge
@@ -191,7 +193,7 @@ private fun RichLine(
     modifier: Modifier = Modifier,
     onLinkClick: (String) -> Unit,
 ) {
-    val annotated = inlineMarkdown(text)
+    val annotated = remember(text) { inlineMarkdown(text) }
     ClickableText(
         text = annotated,
         style = style.copy(color = MaterialTheme.colorScheme.onSurface),

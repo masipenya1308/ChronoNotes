@@ -33,7 +33,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -119,13 +122,21 @@ fun SettingsScreen(vm: NotesViewModel) {
                         )
                     }
                 }
+                // Пока тянем ползунок, меняем только локальное состояние:
+                // иначе каждый тик менял бы Density и перевыкладывал весь текст приложения.
+                var localScale by remember(settings.fontScale) {
+                    mutableStateOf(settings.fontScale)
+                }
                 Text(
-                    "Размер текста: ${String.format("%.0f%%", settings.fontScale * 100)}",
+                    "Размер текста: ${(localScale * 100).toInt()}%",
                     style = MaterialTheme.typography.titleSmall,
                 )
                 Slider(
-                    value = settings.fontScale,
-                    onValueChange = { vm.updateSettings { s -> s.copy(fontScale = it) } },
+                    value = localScale,
+                    onValueChange = { localScale = it },
+                    onValueChangeFinished = {
+                        vm.updateSettings { s -> s.copy(fontScale = localScale) }
+                    },
                     valueRange = 0.7f..1.6f,
                     steps = 8,
                 )

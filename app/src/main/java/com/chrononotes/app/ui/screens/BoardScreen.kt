@@ -47,13 +47,14 @@ import com.chrononotes.app.ui.navigation.openNote
 import com.chrononotes.app.viewmodel.NotesViewModel
 import kotlin.math.roundToInt
 
-private data class DragInfo(val noteId: Long, val dx: Float, val dy: Float)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BoardScreen(vm: NotesViewModel, navController: NavController) {
     val ui by vm.ui.collectAsStateWithLifecycle()
-    var drag by remember { mutableStateOf<DragInfo?>(null) }
+    // В состоянии хранится только id перетаскиваемой карточки (2 изменения за drag).
+    // Сам offset читается внутри graphicsLayer — это обновляет render node без рекомпозиции экрана.
+    var draggingId by remember { mutableStateOf<Long?>(null) }
+    val dragOffset = remember { mutableStateOf(Offset.Zero) }
     val cardBounds = remember { mutableStateMapOf<Long, Rect>() }
 
     Scaffold(
@@ -101,8 +102,7 @@ fun BoardScreen(vm: NotesViewModel, navController: NavController) {
                         )
                         Spacer(Modifier.height(6.dp))
                         notes.forEach { entry ->
-                            val active = drag?.noteId == entry.note.id
-                            val offset = if (active) Offset(drag!!.dx, drag!!.dy) else Offset.Zero
+                            val active = draggingId == entry.note.id
                             Surface(
                                 shape = RoundedCornerShape(12.dp),
                                 tonalElevation = if (active) 12.dp else 2.dp,
@@ -112,55 +112,61 @@ fun BoardScreen(vm: NotesViewModel, navController: NavController) {
                                     .onGloballyPositioned { coords ->
                                         val position = coords.positionInRoot()
                                         val size = coords.size
-                                        cardBounds[entry.note.id] = Rect(
+                                        val rect = Rect(
                                             offset = position,
                                             size = androidx.compose.ui.geometry.Size(
                                                 size.width.toFloat(),
                                                 size.height.toFloat(),
                                             ),
                                         )
+                                        // Не перезаписываем карту без изменений — меньше лишних аллокаций.
+                                        if (cardBounds[entry.note.id] != rect) {
+                                            cardBounds[entry.note.id] = rect
+                                        }
                                     }
                                     .graphicsLayer {
-                                        translationX = offset.x
-                                        translationY = offset.y
-                                        if (active) {
-                                            scaleX = 1.03f
-                                            scaleY = 1.03f
-                                            shadowElevation = 18f
-                                        }
+                                        // Snapshot-чтение здесь обновляет render node без рекомпозиции экрана.
+                                        translationX = if (active) dragOffset.value.x else 0f
+                                        translationY = if (active) dragOffset.value.y else 0f
+                                        val scale = if (active) 1.03f else 1f
+                                        scaleX = scale
+                                        scaleY = scale
+                                        shadowElevation = if (active) 18f else 0f
                                     }
                                     .pointerInput(entry.note.id) {
                                         detectDragGestures(
-                                            onDragStart = { drag = DragInfo(entry.note.id, 0f, 0f) },
+                                            onDragStart = {
+                                                dragOffset.value = Offset.Zero
+                                                draggingId = entry.note.id
+                                            },
                                             onDrag = { change, delta ->
                                                 change.consume()
-                                                drag = drag?.copy(
-                                                    dx = drag!!.dx + delta.x,
-                                                    dy = drag!!.dy + delta.y,
-                                                )
+                                                dragOffset.value += delta
                                             },
                                             onDragEnd = {
-                                                val current = drag
-                                                if (current != null) {
-                                                    val rect = cardBounds[entry.note.id]
-                                                    if (rect != null) {
-                                                        val centerX = rect.center.x + current.dx
-                                                        val centerY = rect.center.y + current.dy
-                                                        val targetIndex = (centerX / columnWidthPx)
-                                                            .roundToInt()
-                                                            .coerceIn(0, BOARD_COLUMNS.lastIndex)
-                                                        val targetColumn = BOARD_COLUMNS[targetIndex].id
-                                                        val position = ui.notes.count { other ->
-                                                            other.note.id != entry.note.id &&
-                                                                other.note.boardColumn == targetColumn &&
-                                                                (cardBounds[other.note.id]?.center?.y ?: Float.MAX_VALUE) < centerY
-                                                        }
-                                                        vm.moveNote(entry.note.id, targetColumn, position)
+                                                val currentOffset = dragOffset.value
+                                                val rect = cardBounds[entry.note.id]
+                                                if (rect != null) {
+                                                    val centerX = rect.center.x + currentOffset.x
+                                                    val centerY = rect.center.y + currentOffset.y
+                                                    val targetIndex = (centerX / columnWidthPx)
+                                                        .roundToInt()
+                                                        .coerceIn(0, BOARD_COLUMNS.lastIndex)
+                                                    val targetColumn = BOARD_COLUMNS[targetIndex].id
+                                                    val position = ui.notes.count { other ->
+                                                        other.note.id != entry.note.id &&
+                                                            other.note.boardColumn == targetColumn &&
+                                                            (cardBounds[other.note.id]?.center?.y ?: Float.MAX_VALUE) < centerY
                                                     }
+                                                    vm.moveNote(entry.note.id, targetColumn, position)
                                                 }
-                                                drag = null
+                                                draggingId = null
+                                                dragOffset.value = Offset.Zero
                                             },
-                                            onDragCancel = { drag = null },
+                                            onDragCancel = {
+                                                draggingId = null
+                                                dragOffset.value = Offset.Zero
+                                            },
                                         )
                                     },
                             ) {

@@ -53,8 +53,12 @@ import com.chrononotes.app.ui.theme.highlight
 import com.chrononotes.app.viewmodel.NotesViewModel
 import java.text.SimpleDateFormat
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.Date
 import java.util.Locale
+
+private val CARD_DATE_FORMAT = SimpleDateFormat("d MMM, HH:mm", Locale.getDefault())
+private val NOTE_DATE_FORMAT = DateTimeFormatter.ofPattern("d MMM", Locale.getDefault())
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -225,6 +229,11 @@ private fun NoteCard(
         .joinToString(" ")
         .ifBlank { "Пустая заметка" }
 
+    val annotatedTitle = remember(note.title, query) {
+        val title = note.title.ifBlank { "Без названия" }
+        if (query.isBlank()) Annotated(title) else highlight(title, query, MaterialTheme.colorScheme.primary)
+    }
+
     Surface(
         shape = RoundedCornerShape(16.dp),
         tonalElevation = 2.dp,
@@ -233,8 +242,7 @@ private fun NoteCard(
         Column(Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = if (query.isBlank()) Annotated(note.title.ifBlank { "Без названия" })
-                    else highlight(note.title.ifBlank { "Без названия" }, query, MaterialTheme.colorScheme.primary),
+                    text = annotatedTitle,
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.weight(1f),
                     maxLines = 1,
@@ -267,7 +275,7 @@ private fun NoteCard(
                 note.noteDate?.let { day ->
                     Icon(Icons.Default.Event, contentDescription = "Дата", modifier = Modifier.size(14.dp))
                     Text(
-                        java.time.format.DateTimeFormatter.ofPattern("d MMM").format(LocalDate.ofEpochDay(day)),
+                        NOTE_DATE_FORMAT.format(LocalDate.ofEpochDay(day)),
                         style = MaterialTheme.typography.labelSmall,
                     )
                 }
@@ -287,5 +295,4 @@ private fun NoteCard(
 
 private fun Annotated(text: String) = androidx.compose.ui.text.AnnotatedString(text)
 
-private fun formatDate(timestamp: Long): String =
-    SimpleDateFormat("d MMM, HH:mm", Locale.getDefault()).format(Date(timestamp))
+private fun formatDate(timestamp: Long): String = CARD_DATE_FORMAT.format(Date(timestamp))

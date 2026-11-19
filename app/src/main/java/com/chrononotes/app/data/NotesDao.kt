@@ -36,11 +36,9 @@ interface NotesDao {
     )
     fun observeNotesForDay(day: Long): Flow<List<NoteWithTags>>
 
-    @Query(
-        "SELECT * FROM notes WHERE reminderAt IS NOT NULL AND reminderAt > :now " +
-            "AND isTrashed = 0 ORDER BY reminderAt ASC",
-    )
-    fun observeUpcomingReminders(now: Long): Flow<List<Note>>
+    // Без параметра `now`: стабильный Flow, фильтрация по времени идёт в UI.
+    @Query("SELECT * FROM notes WHERE reminderAt IS NOT NULL AND isTrashed = 0 ORDER BY reminderAt ASC")
+    fun observeUpcomingReminders(): Flow<List<Note>>
 
     @Query("SELECT * FROM notes WHERE reminderAt IS NOT NULL AND isTrashed = 0")
     suspend fun notesWithReminders(): List<Note>

@@ -22,7 +22,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 enum class ViewMode { LIST, BOARD }
 
@@ -78,10 +82,13 @@ class NotesViewModel(
 
     private fun refreshVault() {
         viewModelScope.launch {
-            val decrypted = if (repo.isUnlocked) {
-                repo.observeEncryptedNotes().first().associate { it.note.id to repo.plain(it.note) }
-            } else {
-                emptyMap()
+            val decrypted = withContext(Dispatchers.IO) {
+                if (repo.isUnlocked) {
+                    repo.observeEncryptedNotes().first()
+                        .associate { it.note.id to repo.plain(it.note) }
+                } else {
+                    emptyMap()
+                }
             }
             _ui.update {
                 it.copy(
@@ -106,7 +113,8 @@ class NotesViewModel(
     /** Заметки, привязанные к конкретному дню (epoch day). */
     fun notesForDay(day: Long): Flow<List<NoteWithTags>> = repo.observeNotesForDay(day)
 
-    fun upcomingReminders(): Flow<List<Note>> = repo.observeUpcomingReminders(System.currentTimeMillis())
+    /** Стабильный Flow: не пересоздаётся при рекомпозиции и не дёргает БД повторно. */
+    val upcomingReminders: Flow<List<Note>> = repo.observeUpcomingReminders()
 
     /** Текст конкретной версии (с учётом расшифровки, если сейф открыт). */
     fun plainVersion(entry: NoteWithTags, version: NoteVersion): String =
@@ -127,7 +135,7 @@ class NotesViewModel(
 
     // --- Заметки ------------------------------------------------------------
 
-    fun save(draft: NoteDraft) = write {
+    fun save(draft: NoteDraft) = write(refreshVault = true) {
         val id = repo.save(draft)
         val at = draft.reminderAt
         if (at != null && at > System.currentTimeMillis()) {
@@ -139,7 +147,7 @@ class NotesViewModel(
 
     fun togglePin(note: Note) = write { repo.setPinned(note.id, !note.isPinned) }
 
-    fun moveNote(id: Long, column: String, position: Int) = write {
+    fun moveNote(id: Long, column: String, position: Int) = write(refreshWidget = false) {
         repo.moveNote(id, column, position)
     }
 
@@ -196,29 +204,32 @@ class NotesViewModel(
 
     // --- Теги ----------------------------------------------------------------
 
-    fun createTag(name: String, colorHex: String) = write { repo.createTag(name, colorHex) }
-    fun deleteTag(tag: Tag) = write { repo.deleteTag(tag) }
+    fun createTag(name: String, colorHex: String) = write(refreshWidget = false) {
+        repo.createTag(name, colorHex)
+    }
+    fun deleteTag(tag: Tag) = write(refreshWidget = false) { repo.deleteTag(tag) }
 
     // --- Сейф ----------------------------------------------------------------
 
-    fun unlock(password: String): Boolean {
+    // PBKDF2 (210 000 итераций) — дорогая операция: NEVER на main-потоке.
+    suspend fun unlock(password: String): Boolean = withContext(Dispatchers.Default) {
         val ok = repo.unlock(password.toCharArray())
         if (ok) {
             _ui.update { it.copy(vaultUnlocked = true) }
             refreshVault()
         }
-        return ok
+        ok
     }
 
-    fun setupPassword(password: String) {
+    suspend fun setupPassword(password: String) = withContext(Dispatchers.Default) {
         repo.setupPassword(password.toCharArray())
         refreshVault()
     }
 
-    suspend fun changePassword(old: String, new: String): Boolean {
+    suspend fun changePassword(old: String, new: String): Boolean = withContext(Dispatchers.Default) {
         val ok = repo.changePassword(old.toCharArray(), new.toCharArray())
         if (ok) refreshVault()
-        return ok
+        ok
     }
 
     fun lockVault() {
@@ -227,16 +238,17 @@ class NotesViewModel(
     }
 
     /** Если есть зашифрованные заметки, сюда попадают только расшифрованные копии. */
-    fun removePassword() = write {
-        val encrypted = repo.observeEncryptedNotes().first()
-        encrypted.forEach { entry ->
-            repo.save(
-                NoteDraft.from(entry.note, plainOf(entry), entry.tags.map { it.id }.toSet())
-                    .copy(encrypted = false),
-            )
+    fun removePassword() = write(refreshVault = true, refreshWidget = false) {
+        withContext(Dispatchers.IO) {
+            val encrypted = repo.observeEncryptedNotes().first()
+            encrypted.forEach { entry ->
+                repo.save(
+                    NoteDraft.from(entry.note, plainOf(entry), entry.tags.map { it.id }.toSet())
+                        .copy(encrypted = false),
+                )
+            }
+            repo.removePassword()
         }
-        repo.removePassword()
-        refreshVault()
     }
 
     fun onBackground() {
@@ -256,18 +268,33 @@ class NotesViewModel(
 
     suspend fun exportMarkdown(): String = JsonIO.exportMarkdown(repo.allNotes()) { repo.plain(it) }
 
-    fun importNotes(text: String) = write {
+    fun importNotes(text: String) = write(refreshVault = true) {
         repo.importNotes(JsonIO.importNotes(text))
         reminders.rescheduleAll(repo.notesWithReminders())
     }
 
     fun updateSettings(transform: (AppSettings) -> AppSettings) = settings.update(transform)
 
-    private fun write(block: suspend () -> Unit) {
-        viewModelScope.launch {
-            block()
-            refreshVault()
-            WidgetUpdater.refresh(appContext)
+    private var widgetRefreshJob: Job? = null
+
+    /**
+     * Все операции записи идут через единую точку.
+     * Сейф перешифровываем только при реальном изменении содержимого,
+     * а обновление виджета дебаунсим, чтобы серия быстрых действий не вызвала шторм broadcaster'ов.
+     */
+    private fun write(
+        refreshVault: Boolean = false,
+        refreshWidget: Boolean = true,
+        block: suspend () -> Unit,
+    ) = viewModelScope.launch {
+        block()
+        if (refreshVault) refreshVault()
+        if (refreshWidget) {
+            widgetRefreshJob?.cancel()
+            widgetRefreshJob = launch {
+                delay(300)
+                WidgetUpdater.refresh(appContext)
+            }
         }
     }
 }

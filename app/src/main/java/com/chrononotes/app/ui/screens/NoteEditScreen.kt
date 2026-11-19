@@ -76,6 +76,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+private val WORD_SPLIT = Regex("\\s+")
 private val EDIT_DATE_FORMAT = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.getDefault())
 private val EDIT_REMINDER_FORMAT = DateTimeFormatter.ofPattern("d MMM, HH:mm", Locale.getDefault())
 
@@ -146,7 +147,7 @@ fun NoteEditScreen(
     DisposableEffect(Unit) { onDispose { commit() } }
     BackHandler { leave() }
 
-    val words = body.split(Regex("\\s+")).count { it.isNotBlank() }
+    val words = body.split(WORD_SPLIT).count { it.isNotBlank() }
 
     Scaffold(
         topBar = {

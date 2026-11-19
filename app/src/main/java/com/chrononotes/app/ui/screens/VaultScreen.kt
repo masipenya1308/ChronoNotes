@@ -98,7 +98,7 @@ fun VaultScreen(vm: NotesViewModel, navController: NavController) {
                         when {
                             password.length < 4 -> error = "Минимум 4 символа"
                             password != confirm -> error = "Пароли не совпадают"
-                            else -> {
+                            else -> scope.launch {
                                 vm.setupPassword(password)
                                 password = ""
                                 confirm = ""
@@ -121,11 +121,13 @@ fun VaultScreen(vm: NotesViewModel, navController: NavController) {
                     onConfirm = {},
                     buttonText = "Открыть сейф",
                     onSubmit = {
-                        if (vm.unlock(password)) {
-                            password = ""
-                            error = null
-                        } else {
-                            error = "Неверный пароль"
+                        scope.launch {
+                            if (vm.unlock(password)) {
+                                password = ""
+                                error = null
+                            } else {
+                                error = "Неверный пароль"
+                            }
                         }
                     },
                     extraButton = {

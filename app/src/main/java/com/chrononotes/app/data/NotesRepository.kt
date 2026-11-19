@@ -1,8 +1,10 @@
 package com.chrononotes.app.data
 
 import com.chrononotes.app.crypto.CryptoManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 
 class NotesRepository(
     private val dao: NotesDao,
@@ -17,7 +19,7 @@ class NotesRepository(
     fun observeTrashed(): Flow<List<Note>> = dao.observeTrashed()
     fun observeArchived(): Flow<List<Note>> = dao.observeArchived()
     fun observeNotesForDay(day: Long): Flow<List<NoteWithTags>> = dao.observeNotesForDay(day)
-    fun observeUpcomingReminders(now: Long): Flow<List<Note>> = dao.observeUpcomingReminders(now)
+    fun observeUpcomingReminders(): Flow<List<Note>> = dao.observeUpcomingReminders()
     suspend fun notesWithReminders(): List<Note> = dao.notesWithReminders()
     fun observeTags(): Flow<List<Tag>> = dao.observeTags()
     fun observeVersions(noteId: Long): Flow<List<NoteVersion>> = dao.observeVersions(noteId)
@@ -105,15 +107,15 @@ class NotesRepository(
     fun removePassword() = crypto.clearPassword()
 
     /** Смена пароля перешифровывает все заметки сейфа новым ключом. */
-    suspend fun changePassword(old: CharArray, new: CharArray): Boolean {
-        if (!crypto.unlock(old)) return false
+    suspend fun changePassword(old: CharArray, new: CharArray): Boolean = withContext(Dispatchers.Default) {
+        if (!crypto.unlock(old)) return@withContext false
         val entries = dao.observeEncryptedNotes().first()
         val decrypted = entries.map { it to crypto.decrypt(it.note.content) }
         crypto.setPassword(new)
         decrypted.forEach { (entry, plain) ->
             save(NoteDraft.from(entry.note, plain, entry.tags.map { it.id }.toSet()))
         }
-        return true
+        true
     }
 
     private companion object {

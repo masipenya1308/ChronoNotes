@@ -41,11 +41,14 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+private val VERSION_DATE_FORMAT = SimpleDateFormat("d MMM yyyy, HH:mm:ss", Locale.getDefault())
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryScreen(vm: NotesViewModel, navController: NavController, noteId: Long) {
     val ui by vm.ui.collectAsStateWithLifecycle()
-    val versions by vm.versions(noteId).collectAsStateWithLifecycle(initialValue = emptyList())
+    val versionsFlow = remember(noteId) { vm.versions(noteId) }
+    val versions by versionsFlow.collectAsStateWithLifecycle(initialValue = emptyList())
     var selected by remember { mutableStateOf<NoteVersion?>(null) }
     val entry = ui.notes.firstOrNull { it.note.id == noteId }
 
@@ -84,8 +87,7 @@ fun HistoryScreen(vm: NotesViewModel, navController: NavController, noteId: Long
                         Icon(Icons.Default.History, contentDescription = null)
                         Column(Modifier.padding(start = 12.dp)) {
                             Text(
-                                SimpleDateFormat("d MMM yyyy, HH:mm:ss", Locale.getDefault())
-                                    .format(Date(version.savedAt)),
+                                VERSION_DATE_FORMAT.format(Date(version.savedAt)),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.primary,
                             )

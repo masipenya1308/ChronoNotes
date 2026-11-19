@@ -65,7 +65,11 @@ private val REMINDER_FORMAT = DateTimeFormatter.ofPattern("d MMM, HH:mm", Locale
 @Composable
 fun CalendarScreen(vm: NotesViewModel, navController: NavController) {
     val ui by vm.ui.collectAsStateWithLifecycle()
-    val reminders by vm.upcomingReminders().collectAsStateWithLifecycle(initialValue = emptyList())
+    val allReminders by vm.upcomingReminders.collectAsStateWithLifecycle(initialValue = emptyList())
+    val reminders = remember(allReminders) {
+        val now = System.currentTimeMillis()
+        allReminders.filter { it.reminderAt != null && it.reminderAt!! > now }
+    }
 
     var month by remember { mutableStateOf(YearMonth.now()) }
     var selectedDay by remember { mutableStateOf(LocalDate.now()) }

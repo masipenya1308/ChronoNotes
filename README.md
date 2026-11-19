@@ -46,20 +46,6 @@ app/src/main/java/com/chrononotes/app/
 └── widget/        # AppWidgetProvider
 ```
 
-## Локальная сборка
-
-Android Studio (Ladybug или новее) — просто откройте папку `ChronoNotes` и запустите `Build APK`.
-
-Из командной строки (нужны JDK 17, Android SDK и установленный Gradle 8.7):
-
-```bash
-gradle assembleDebug
-```
-
-APK появится в `app/build/outputs/apk/debug/`. Скрипт `gradlew` и `gradle-wrapper.jar` не включены — GitHub Actions и Android Studio создают wrapper автоматически.
-
-Минимальная версия Android: **8.0 (API 26)**.
-
 ## Разрешения
 
 - `POST_NOTIFICATIONS` (Android 13+) — для напоминаний, запрашивается при запуске

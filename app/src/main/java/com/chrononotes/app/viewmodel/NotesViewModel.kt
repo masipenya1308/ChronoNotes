@@ -220,25 +220,47 @@ class NotesViewModel(
 
     // --- Сейф ----------------------------------------------------------------
 
-    // PBKDF2 (210 000 итераций) — дорогая операция: NEVER на main-потоке.
+    // PBKDF2 — дорогая операция: только вне main-потока. Массив пароля зануляем после использования.
     suspend fun unlock(password: String): Boolean = withContext(Dispatchers.Default) {
-        val ok = repo.unlock(password.toCharArray())
-        if (ok) {
-            _ui.update { it.copy(vaultUnlocked = true) }
-            refreshVault()
+        if (repo.lockRemainingMs > 0) {
+            val seconds = (repo.lockRemainingMs + 999) / 1000
+            _ui.update { it.copy(error = "Слишком много попыток. Попробуйте через $seconds с") }
+            return@withContext false
         }
-        ok
+        val chars = password.toCharArray()
+        try {
+            val ok = repo.unlock(chars)
+            if (ok) {
+                _ui.update { it.copy(vaultUnlocked = true) }
+                refreshVault()
+            }
+            ok
+        } finally {
+            chars.fill('\u0000')
+        }
     }
 
     suspend fun setupPassword(password: String) = withContext(Dispatchers.Default) {
-        repo.setupPassword(password.toCharArray())
-        refreshVault()
+        val chars = password.toCharArray()
+        try {
+            repo.setupPassword(chars)
+            refreshVault()
+        } finally {
+            chars.fill('\u0000')
+        }
     }
 
     suspend fun changePassword(old: String, new: String): Boolean = withContext(Dispatchers.Default) {
-        val ok = repo.changePassword(old.toCharArray(), new.toCharArray())
-        if (ok) refreshVault()
-        ok
+        val oldChars = old.toCharArray()
+        val newChars = new.toCharArray()
+        try {
+            val ok = repo.changePassword(oldChars, newChars)
+            if (ok) refreshVault()
+            ok
+        } finally {
+            oldChars.fill('\u0000')
+            newChars.fill('\u0000')
+        }
     }
 
     fun lockVault() {
@@ -257,11 +279,20 @@ class NotesViewModel(
         }
     }
 
+    private var autoLockJob: Job? = null
+
     fun onBackground() {
         backgroundAt = SystemClock.elapsedRealtime()
+        autoLockJob?.cancel()
+        // Блокируем сейф даже пока приложение в фоне, а не только при возврате.
+        autoLockJob = viewModelScope.launch {
+            delay(appSettings.value.autoLockMinutes * 60_000L)
+            lockVault()
+        }
     }
 
     fun onForeground(autoLockMinutes: Int) {
+        autoLockJob?.cancel()
         if (backgroundAt == 0L) return
         val elapsed = SystemClock.elapsedRealtime() - backgroundAt
         backgroundAt = 0L

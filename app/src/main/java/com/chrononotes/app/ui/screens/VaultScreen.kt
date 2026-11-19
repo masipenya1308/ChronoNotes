@@ -96,7 +96,7 @@ fun VaultScreen(vm: NotesViewModel, navController: NavController) {
                     buttonText = "Создать сейф",
                     onSubmit = {
                         when {
-                            password.length < 4 -> error = "Минимум 4 символа"
+                            password.length < 8 -> error = "Минимум 8 символов"
                             password != confirm -> error = "Пароли не совпадают"
                             else -> scope.launch {
                                 vm.setupPassword(password)
@@ -305,7 +305,7 @@ private fun ChangePasswordDialog(onDismiss: () -> Unit, onSubmit: (String, Strin
         },
         confirmButton = {
             TextButton(onClick = {
-                if (new.length >= 4 && new == repeat) onSubmit(old, new) else onDismiss()
+                if (new.length >= 8 && new == repeat) onSubmit(old, new) else onDismiss()
             }) { Text("Сменить") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } },

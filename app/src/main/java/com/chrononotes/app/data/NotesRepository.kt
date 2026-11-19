@@ -14,6 +14,7 @@ class NotesRepository(
 
     val hasPassword: Boolean get() = crypto.isConfigured
     val isUnlocked: Boolean get() = crypto.isUnlocked
+    val lockRemainingMs: Long get() = crypto.lockRemainingMs
 
     fun observeNotes(): Flow<List<NoteWithTags>> = dao.observeNotes()
     fun observeEncryptedNotes(): Flow<List<NoteWithTags>> = dao.observeEncryptedNotes()

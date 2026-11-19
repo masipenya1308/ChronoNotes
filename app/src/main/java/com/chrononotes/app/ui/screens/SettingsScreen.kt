@@ -158,7 +158,8 @@ fun SettingsScreen(vm: NotesViewModel) {
             SettingsCard("Данные") {
                 Text(
                     "Экспорт и импорт работают через системный выбор файла. " +
-                        "Шифротекст сохраняется как есть — для чтения понадобится ваш пароль.",
+                        "В JSON шифротекст сохраняется как есть, но Markdown-экспорт содержит " +
+                        "РАСШИФРОВАННОЕ содержимое сейфа — не публикуйте такой файл.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

@@ -45,14 +45,14 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Build debug APK
-        run: gradle assembleDebug --no-daemon --stacktrace
+      - name: Build release APK
+        run: gradle assembleRelease --no-daemon --stacktrace
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ChronoNotes-debug
-          path: app/build/outputs/apk/debug/*.apk
+          name: ChronoNotes-release
+          path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
 
       # По тегу v* сборка сама создаёт релиз и прикрепляет APK.
@@ -60,7 +60,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: app/build/outputs/apk/debug/*.apk
+          files: app/build/outputs/apk/release/*.apk
           generate_release_notes: true
           draft: false
           prerelease: false

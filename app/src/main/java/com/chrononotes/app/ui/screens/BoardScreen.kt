@@ -39,6 +39,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.chrononotes.app.data.BOARD_COLUMNS
@@ -55,6 +56,8 @@ fun BoardScreen(vm: NotesViewModel, navController: NavController) {
     // Сам offset читается внутри graphicsLayer — это обновляет render node без рекомпозиции экрана.
     var draggingId by remember { mutableStateOf<Long?>(null) }
     val dragOffset = remember { mutableStateOf(Offset.Zero) }
+    // Точка касания пальца в координатах экрана — по ней определяем колонку, а не по рамке карточки.
+    val dragStartTouch = remember { mutableStateOf(Offset.Zero) }
     val cardBounds = remember { mutableStateMapOf<Long, Rect>() }
 
     Scaffold(
@@ -90,6 +93,9 @@ fun BoardScreen(vm: NotesViewModel, navController: NavController) {
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight()
+                            // Колонка с перетаскиваемой карточкой рисуется поверх соседних,
+                            // иначе карточка «проваливается» под текстуры колонок справа.
+                            .zIndex(if (notes.any { it.note.id == draggingId }) 10f else 0f)
                             .padding(4.dp)
                             .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(16.dp))
                             .padding(8.dp),
@@ -108,6 +114,7 @@ fun BoardScreen(vm: NotesViewModel, navController: NavController) {
                                 tonalElevation = if (active) 12.dp else 2.dp,
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .zIndex(if (active) 1f else 0f)
                                     .padding(vertical = 4.dp)
                                     .onGloballyPositioned { coords ->
                                         val position = coords.positionInRoot()
@@ -135,7 +142,15 @@ fun BoardScreen(vm: NotesViewModel, navController: NavController) {
                                     }
                                     .pointerInput(entry.note.id) {
                                         detectDragGestures(
-                                            onDragStart = {
+                                            onDragStart = { start ->
+                                                // start — координаты касания внутри карточки.
+                                                // Переводим их в координаты экрана один раз и дальше двигаем вместе с пальцем.
+                                                val rect = cardBounds[entry.note.id]
+                                                dragStartTouch.value = if (rect != null) {
+                                                    rect.topLeft + start
+                                                } else {
+                                                    start
+                                                }
                                                 dragOffset.value = Offset.Zero
                                                 draggingId = entry.note.id
                                             },
@@ -145,21 +160,19 @@ fun BoardScreen(vm: NotesViewModel, navController: NavController) {
                                             },
                                             onDragEnd = {
                                                 val currentOffset = dragOffset.value
-                                                val rect = cardBounds[entry.note.id]
-                                                if (rect != null) {
-                                                    val centerX = rect.center.x + currentOffset.x
-                                                    val centerY = rect.center.y + currentOffset.y
-                                                    val targetIndex = (centerX / columnWidthPx)
-                                                        .roundToInt()
-                                                        .coerceIn(0, BOARD_COLUMNS.lastIndex)
-                                                    val targetColumn = BOARD_COLUMNS[targetIndex].id
-                                                    val position = ui.notes.count { other ->
-                                                        other.note.id != entry.note.id &&
-                                                            other.note.boardColumn == targetColumn &&
-                                                            (cardBounds[other.note.id]?.center?.y ?: Float.MAX_VALUE) < centerY
-                                                    }
-                                                    vm.moveNote(entry.note.id, targetColumn, position)
+                                                // Ориентир — палец, а не рамка карточки: колонка меняется
+                                                // только когда точка касания оказывается ближе к центру другой колонки.
+                                                val touch = dragStartTouch.value + currentOffset
+                                                val targetIndex = (touch.x / columnWidthPx)
+                                                    .roundToInt()
+                                                    .coerceIn(0, BOARD_COLUMNS.lastIndex)
+                                                val targetColumn = BOARD_COLUMNS[targetIndex].id
+                                                val position = ui.notes.count { other ->
+                                                    other.note.id != entry.note.id &&
+                                                        other.note.boardColumn == targetColumn &&
+                                                        (cardBounds[other.note.id]?.center?.y ?: Float.MAX_VALUE) < touch.y
                                                 }
+                                                vm.moveNote(entry.note.id, targetColumn, position)
                                                 draggingId = null
                                                 dragOffset.value = Offset.Zero
                                             },

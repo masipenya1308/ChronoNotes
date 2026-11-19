@@ -10,6 +10,7 @@ data class AppSettings(
     val fontScale: Float = 1f,
     val autoLockMinutes: Int = 5,
     val accent: Int = 0,
+    val skippedVersion: String = "",
 )
 
 class SettingsRepository(context: Context) {
@@ -22,6 +23,7 @@ class SettingsRepository(context: Context) {
             fontScale = prefs.getFloat(KEY_FONT, 1f),
             autoLockMinutes = prefs.getInt(KEY_LOCK, 5),
             accent = prefs.getInt(KEY_ACCENT, 0),
+            skippedVersion = prefs.getString(KEY_SKIPPED, "") ?: "",
         ),
     )
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
@@ -33,6 +35,7 @@ class SettingsRepository(context: Context) {
             .putFloat(KEY_FONT, next.fontScale)
             .putInt(KEY_LOCK, next.autoLockMinutes)
             .putInt(KEY_ACCENT, next.accent)
+            .putString(KEY_SKIPPED, next.skippedVersion)
             .apply()
         _settings.value = next
     }
@@ -42,5 +45,6 @@ class SettingsRepository(context: Context) {
         const val KEY_FONT = "font_scale"
         const val KEY_LOCK = "auto_lock_minutes"
         const val KEY_ACCENT = "accent"
+        const val KEY_SKIPPED = "skipped_version"
     }
 }

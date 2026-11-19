@@ -1,5 +1,7 @@
 package com.chrononotes.app.ui.screens
 
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -20,6 +22,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -43,7 +46,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.chrononotes.app.BuildConfig
 import com.chrononotes.app.ui.theme.AccentColors
+import com.chrononotes.app.util.AppRelease
+import com.chrononotes.app.util.UpdateChecker
 import com.chrononotes.app.viewmodel.NotesViewModel
 import kotlinx.coroutines.launch
 
@@ -53,6 +59,9 @@ fun SettingsScreen(vm: NotesViewModel) {
     val settings by vm.appSettings.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    var checking by remember { mutableStateOf(false) }
+    var availableRelease by remember { mutableStateOf<AppRelease?>(null) }
 
     val exportJsonLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json"),
@@ -181,14 +190,74 @@ fun SettingsScreen(vm: NotesViewModel) {
             SettingsCard("О приложении") {
                 Text("ChronoNotes", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "Аналог EasyNotes с расширенными возможностями: Markdown с интерактивными " +
-                        "чек-листами, теги, закрепление, шифрованный сейф, история версий, " +
+                    "Версия ${BuildConfig.VERSION_NAME}. Аналог EasyNotes с расширенными " +
+                        "возможностями: Markdown с интерактивными чек-листами, теги, " +
+                        "шифрованный сейф, история версий, календарь и напоминания, " +
                         "канбан-доска с drag-and-drop, корзина и виджет.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                Spacer(Modifier.height(10.dp))
+                OutlinedButton(
+                    onClick = {
+                        scope.launch {
+                            checking = true
+                            runCatching { UpdateChecker.latest() }
+                                .onSuccess { release ->
+                                    if (
+                                        UpdateChecker.isNewer(release.tag, BuildConfig.VERSION_NAME) &&
+                                        release.tag != settings.skippedVersion
+                                    ) {
+                                        availableRelease = release
+                                    } else {
+                                        Toast.makeText(context, "У вас актуальная версия", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                                .onFailure {
+                                    Toast.makeText(context, "Не удалось проверить обновления", Toast.LENGTH_SHORT).show()
+                                }
+                            checking = false
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !checking,
+                ) {
+                    Text(if (checking) "Проверяю…" else "Проверить обновления")
+                }
             }
         }
+    }
+
+    availableRelease?.let { release ->
+        AlertDialog(
+            onDismissRequest = { availableRelease = null },
+            title = { Text("Доступно обновление ${release.tag}") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    Text(release.name, style = MaterialTheme.typography.titleSmall)
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        release.notes.ifBlank { "Описание отсутствует." },
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    runCatching {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(release.apkUrl)))
+                    }
+                    availableRelease = null
+                }) { Text("Обновить") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    vm.updateSettings { it.copy(skippedVersion = release.tag) }
+                    availableRelease = null
+                    Toast.makeText(context, "Версия ${release.tag} пропущена", Toast.LENGTH_SHORT).show()
+                }) { Text("Пропустить версию") }
+            },
+        )
     }
 }
 

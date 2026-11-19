@@ -150,7 +150,7 @@ fun NoteEditScreen(
                 boardColumn = column,
                 pinned = pinned,
                 encrypted = encrypted,
-                archived = entry?.note?.archived ?: false,
+                archived = entry?.note?.isArchived ?: false,
                 isTrashed = entry?.note?.isTrashed ?: false,
                 noteDate = noteDate,
                 reminderAt = reminderAt,

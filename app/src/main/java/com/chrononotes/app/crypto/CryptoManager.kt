@@ -235,6 +235,7 @@ class CryptoManager(context: Context) {
         const val TAG_BITS = 128
         const val TAG_LENGTH = TAG_BITS / 8
         const val IV_LENGTH = 12
+        const val SALT_LENGTH = 16
         const val MAX_ATTEMPTS = 3
         const val BASE_LOCK_MS = 2_000L
         const val MAX_LOCK_MS = 60_000L

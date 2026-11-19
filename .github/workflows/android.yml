@@ -45,6 +45,17 @@ jobs:
         with:
           gradle-version: '8.7'
 
+      - name: Prepare CI signing keystore
+        run: |
+          keytool -genkeypair -v -keystore "$RUNNER_TEMP/ci-release.jks" \
+            -storepass android -keypass android -alias chrononotes \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=ChronoNotes CI" >/dev/null 2>&1
+          echo "RELEASE_STORE_FILE=$RUNNER_TEMP/ci-release.jks" >> "$GITHUB_ENV"
+          echo "RELEASE_STORE_PASSWORD=android" >> "$GITHUB_ENV"
+          echo "RELEASE_KEY_ALIAS=chrononotes" >> "$GITHUB_ENV"
+          echo "RELEASE_KEY_PASSWORD=android" >> "$GITHUB_ENV"
+
       - name: Build release APK
         run: gradle assembleRelease --no-daemon --stacktrace
 

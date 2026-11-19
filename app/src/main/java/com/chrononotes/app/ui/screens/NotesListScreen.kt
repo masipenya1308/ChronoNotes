@@ -229,9 +229,10 @@ private fun NoteCard(
         .joinToString(" ")
         .ifBlank { "Пустая заметка" }
 
-    val annotatedTitle = remember(note.title, query) {
+    val titleColor = MaterialTheme.colorScheme.primary
+    val annotatedTitle = remember(note.title, query, titleColor) {
         val title = note.title.ifBlank { "Без названия" }
-        if (query.isBlank()) Annotated(title) else highlight(title, query, MaterialTheme.colorScheme.primary)
+        if (query.isBlank()) Annotated(title) else highlight(title, query, titleColor)
     }
 
     Surface(

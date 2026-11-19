@@ -46,17 +46,6 @@ app/src/main/java/com/chrononotes/app/
 └── widget/        # AppWidgetProvider
 ```
 
-## Сборка через GitHub Actions (рекомендуется)
-
-Готовый workflow: `.github/workflows/android.yml`.
-
-1. Создайте репозиторий `ChronoNotes` на GitHub и залейте туда содержимое этой папки.
-2. В `README.md` замените `YOUR_USERNAME` в бейдже на свой логин.
-3. Откройте вкладку **Actions** → подтвердите запуск workflow (первый запуск на `push`).
-4. После зелёной сборки скачайте APK из раздела **Artifacts** → `ChronoNotes-debug`.
-
-Workflow автоматически ставит JDK 17, Android SDK (platform 34, build-tools 34.0.0) и Gradle 8.7 — локальная среда не нужна. Запускается на `push` в `main`/`master`, на `pull_request` и вручную через `workflow_dispatch`.
-
 ## Локальная сборка
 
 Android Studio (Ladybug или новее) — просто откройте папку `ChronoNotes` и запустите `Build APK`.

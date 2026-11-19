@@ -21,7 +21,7 @@ fun TagChip(tag: Tag, onClick: (() -> Unit)? = null) {
         label = { Text(tag.name, style = androidx.compose.material3.MaterialTheme.typography.labelSmall) },
         leadingIcon = {
             Icon(
-                androidx.compose.material.icons.Icons.Default.Label,
+                androidx.compose.material.icons.Icons.Default.Tag,
                 contentDescription = null,
                 modifier = Modifier.size(14.dp),
                 tint = hexToColor(tag.colorHex),
@@ -40,7 +40,7 @@ fun SelectableTagChip(tag: Tag, selected: Boolean, onToggle: () -> Unit) {
         label = { Text(tag.name, style = androidx.compose.material3.MaterialTheme.typography.labelSmall) },
         leadingIcon = {
             Icon(
-                androidx.compose.material.icons.Icons.Default.Label,
+                androidx.compose.material.icons.Icons.Default.Tag,
                 contentDescription = null,
                 modifier = Modifier.size(14.dp),
                 tint = if (selected) Color.Unspecified else hexToColor(tag.colorHex),

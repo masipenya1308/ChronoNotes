@@ -41,6 +41,7 @@ data class UiState(
     val vaultConfigured: Boolean = false,
     val vaultUnlocked: Boolean = false,
     val decrypted: Map<Long, String> = emptyMap(),
+    val error: String? = null,
 )
 
 class NotesViewModel(
@@ -82,20 +83,25 @@ class NotesViewModel(
 
     private fun refreshVault() {
         viewModelScope.launch {
-            val decrypted = withContext(Dispatchers.IO) {
-                if (repo.isUnlocked) {
-                    repo.observeEncryptedNotes().first()
-                        .associate { it.note.id to repo.plain(it.note) }
-                } else {
-                    emptyMap()
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    if (repo.isUnlocked) {
+                        repo.observeEncryptedNotes().first()
+                            .associate { it.note.id to repo.plain(it.note) }
+                    } else {
+                        emptyMap()
+                    }
                 }
-            }
-            _ui.update {
-                it.copy(
-                    vaultConfigured = repo.hasPassword,
-                    vaultUnlocked = repo.isUnlocked,
-                    decrypted = decrypted,
-                )
+            }.onSuccess { decrypted ->
+                _ui.update {
+                    it.copy(
+                        vaultConfigured = repo.hasPassword,
+                        vaultUnlocked = repo.isUnlocked,
+                        decrypted = decrypted,
+                    )
+                }
+            }.onFailure { e ->
+                _ui.update { it.copy(error = e.message?.take(200) ?: "Ошибка сейфа") }
             }
         }
     }
@@ -130,6 +136,8 @@ class NotesViewModel(
     }
 
     fun clearFilters() = _ui.update { it.copy(query = "", activeTagIds = emptySet()) }
+
+    fun clearError() = _ui.update { it.copy(error = null) }
 
     fun setViewMode(mode: ViewMode) = _ui.update { it.copy(viewMode = mode) }
 
@@ -172,7 +180,8 @@ class NotesViewModel(
     }
 
     fun emptyTrash() = write {
-        repo.notesWithReminders().forEach { reminders.cancel(it.id) }
+        // Отменяем напоминания только у заметок из корзины.
+        repo.trashedNotesWithReminders().forEach { reminders.cancel(it.id) }
         repo.emptyTrash()
     }
 
@@ -237,17 +246,14 @@ class NotesViewModel(
         _ui.update { it.copy(vaultUnlocked = false, decrypted = emptyMap()) }
     }
 
-    /** Если есть зашифрованные заметки, сюда попадают только расшифрованные копии. */
+    /** Сброс доступен только при открытом сейфе; при ошибке пароль и данные остаются нетронутыми. */
     fun removePassword() = write(refreshVault = true, refreshWidget = false) {
-        withContext(Dispatchers.IO) {
-            val encrypted = repo.observeEncryptedNotes().first()
-            encrypted.forEach { entry ->
-                repo.save(
-                    NoteDraft.from(entry.note, plainOf(entry), entry.tags.map { it.id }.toSet())
-                        .copy(encrypted = false),
-                )
-            }
-            repo.removePassword()
+        if (!repo.isUnlocked) {
+            _ui.update { it.copy(error = "Сначала откройте сейф") }
+            return@write
+        }
+        if (!repo.removePasswordSafely()) {
+            _ui.update { it.copy(error = "Не удалось расшифровать все заметки — пароль не сброшен") }
         }
     }
 
@@ -287,13 +293,19 @@ class NotesViewModel(
         refreshWidget: Boolean = true,
         block: suspend () -> Unit,
     ) = viewModelScope.launch {
-        block()
-        if (refreshVault) refreshVault()
-        if (refreshWidget) {
-            widgetRefreshJob?.cancel()
-            widgetRefreshJob = launch {
-                delay(300)
-                WidgetUpdater.refresh(appContext)
+        try {
+            block()
+            if (refreshVault) refreshVault()
+            if (refreshWidget) {
+                widgetRefreshJob?.cancel()
+                widgetRefreshJob = launch {
+                    delay(300)
+                    WidgetUpdater.refresh(appContext)
+                }
+            }
+        } catch (e: Exception) {
+            _ui.update {
+                it.copy(error = e.message?.take(200) ?: "Не удалось выполнить операцию")
             }
         }
     }

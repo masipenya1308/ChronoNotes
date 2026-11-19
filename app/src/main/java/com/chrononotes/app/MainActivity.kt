@@ -41,7 +41,7 @@ class MainActivity : ComponentActivity() {
         }
 
         val app = application as ChronoNotesApp
-        val repository = NotesRepository(app.database.dao(), CryptoManager(app))
+        val repository = NotesRepository(app.database.dao(), CryptoManager(app), app.database)
         val settingsRepository = SettingsRepository(this)
         val viewModel = ViewModelProvider(
             this,

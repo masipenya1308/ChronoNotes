@@ -130,11 +130,6 @@ fun VaultScreen(vm: NotesViewModel, navController: NavController) {
                             }
                         }
                     },
-                    extraButton = {
-                        TextButton(onClick = { showRemove = true }) {
-                            Text("Сбросить сейф")
-                        }
-                    },
                 )
             }
 
@@ -185,6 +180,14 @@ fun VaultScreen(vm: NotesViewModel, navController: NavController) {
                                 style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.padding(16.dp),
                             )
+                        }
+                    }
+                    item {
+                        TextButton(
+                            onClick = { showRemove = true },
+                            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                        ) {
+                            Text("Сбросить пароль и расшифровать заметки")
                         }
                     }
                 }

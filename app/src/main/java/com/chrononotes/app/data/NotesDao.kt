@@ -43,6 +43,24 @@ interface NotesDao {
     @Query("SELECT * FROM notes WHERE reminderAt IS NOT NULL AND isTrashed = 0")
     suspend fun notesWithReminders(): List<Note>
 
+    @Query("SELECT * FROM notes WHERE reminderAt IS NOT NULL AND isTrashed = 1")
+    suspend fun trashedNotesWithReminders(): List<Note>
+
+    @Query("SELECT * FROM notes WHERE isEncrypted = 1")
+    suspend fun allEncryptedNotes(): List<Note>
+
+    @Query("SELECT * FROM note_versions")
+    suspend fun allVersions(): List<NoteVersion>
+
+    @Query("UPDATE note_versions SET title = :title, content = :content WHERE id = :id")
+    suspend fun updateVersion(id: Long, title: String, content: String)
+
+    @Query("DELETE FROM note_versions WHERE noteId IN (SELECT id FROM notes WHERE isTrashed = 1)")
+    suspend fun clearVersionsOfTrashed()
+
+    @Query("DELETE FROM note_tags WHERE noteId IN (SELECT id FROM notes WHERE isTrashed = 1)")
+    suspend fun unlinkTagsOfTrashed()
+
     @Query("SELECT * FROM notes WHERE id = :id")
     suspend fun getById(id: Long): Note?
 

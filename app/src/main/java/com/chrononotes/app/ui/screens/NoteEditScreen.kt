@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -50,6 +51,7 @@ import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -66,6 +68,7 @@ import androidx.navigation.NavController
 import com.chrononotes.app.data.BOARD_COLUMNS
 import com.chrononotes.app.data.COLUMN_INBOX
 import com.chrononotes.app.data.NoteDraft
+import com.chrononotes.app.data.NoteWithTags
 import com.chrononotes.app.ui.components.MarkdownText
 import com.chrononotes.app.ui.theme.TagColors
 import com.chrononotes.app.ui.theme.hexToColor
@@ -92,10 +95,16 @@ fun NoteEditScreen(
     val ui by vm.ui.collectAsStateWithLifecycle()
     val entry = remember(noteId, ui.notes, ui.trashed) {
         ui.notes.firstOrNull { it.note.id == noteId }
+            ?: ui.trashed.firstOrNull { it.id == noteId }?.let { NoteWithTags(it) }
     }
+    val isLocked = entry?.note?.isEncrypted == true && !ui.vaultUnlocked
 
     var title by remember(noteId) { mutableStateOf(entry?.note?.title.orEmpty()) }
-    var body by remember(noteId) { mutableStateOf(entry?.let { vm.plainOf(it) }.orEmpty()) }
+    var body by remember(noteId) {
+        mutableStateOf(
+            entry?.let { if (it.note.isEncrypted && !ui.vaultUnlocked) "" else vm.plainOf(it) }.orEmpty(),
+        )
+    }
     var pinned by remember(noteId) { mutableStateOf(entry?.note?.isPinned ?: false) }
     var encrypted by remember(noteId) {
         mutableStateOf(fromVault || entry?.note?.isEncrypted ?: false)
@@ -110,6 +119,11 @@ fun NoteEditScreen(
     }
     var reminderAt by remember(noteId) { mutableStateOf(entry?.note?.reminderAt) }
 
+    // Deep-link может открыть экран раньше, чем Flow выдаст заметку/разблокирует сейф.
+    LaunchedEffect(entry?.note?.id, ui.vaultUnlocked) {
+        if (entry != null && !isLocked) body = vm.plainOf(entry)
+    }
+
     var showDatePicker by remember { mutableStateOf(false) }
     var showReminderDate by remember { mutableStateOf(false) }
     var showReminderTime by remember { mutableStateOf(false) }
@@ -120,9 +134,12 @@ fun NoteEditScreen(
     var done by remember { mutableStateOf(false) }
 
     fun commit() {
-        if (done) return
+        // Заблокированный сейф: ни в коем случае не сохраняем placebo-текст вместо заметки.
+        if (done || isLocked) return
+        // Заметка ещё не загрузилась из Flow — сохранять нечего.
+        if (noteId > 0 && entry == null) return
+        if (title.isBlank() && body.isBlank() && noteId <= 0) return
         done = true
-        if (title.isBlank() && body.isBlank() && entry == null) return
         vm.save(
             NoteDraft(
                 id = noteId,
@@ -133,6 +150,8 @@ fun NoteEditScreen(
                 boardColumn = column,
                 pinned = pinned,
                 encrypted = encrypted,
+                archived = entry?.note?.archived ?: false,
+                isTrashed = entry?.note?.isTrashed ?: false,
                 noteDate = noteDate,
                 reminderAt = reminderAt,
             ),
@@ -148,6 +167,38 @@ fun NoteEditScreen(
     BackHandler { leave() }
 
     val words = body.split(WORD_SPLIT).count { it.isNotBlank() }
+
+    if (isLocked) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("Сейф заблокирован") },
+                    navigationIcon = {
+                        IconButton(onClick = { navController.popBackStack() }) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Назад")
+                        }
+                    },
+                )
+            },
+        ) { padding ->
+            Column(
+                Modifier.fillMaxSize().padding(padding).padding(24.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Icon(Icons.Default.Lock, contentDescription = null)
+                Text(
+                    "Эта заметка находится в сейфе. Откройте сейф, чтобы посмотреть и отредактировать её.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(vertical = 16.dp),
+                )
+                Button(onClick = { navController.navigate("vault") }) {
+                    Text("Открыть сейф")
+                }
+            }
+        }
+        return
+    }
 
     Scaffold(
         topBar = {

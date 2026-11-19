@@ -83,6 +83,7 @@ data class NoteDraft(
     val pinned: Boolean = false,
     val encrypted: Boolean = false,
     val archived: Boolean = false,
+    val isTrashed: Boolean = false,
     val noteDate: Long? = null,
     val reminderAt: Long? = null,
 ) {
@@ -97,6 +98,7 @@ data class NoteDraft(
             pinned = note.isPinned,
             encrypted = note.isEncrypted,
             archived = note.isArchived,
+            isTrashed = note.isTrashed,
             noteDate = note.noteDate,
             reminderAt = note.reminderAt,
         )

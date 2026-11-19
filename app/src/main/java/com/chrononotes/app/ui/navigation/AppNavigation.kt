@@ -17,6 +17,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import android.widget.Toast
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -57,6 +60,15 @@ fun AppNavigation(
     val backStack by navController.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route.orEmpty()
     val showBottomBar = TABS.any { it.route == currentRoute }
+    val ui by vm.ui.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
+    LaunchedEffect(ui.error) {
+        ui.error?.let {
+            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            vm.clearError()
+        }
+    }
 
     AutoLockEffect(vm)
 
